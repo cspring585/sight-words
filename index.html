@@ -10,7 +10,13 @@ font-family: 'Comic Sans MS', sans-serif;
 margin: 0; padding: 0;
 width: 100vw; height: 100vh;
 overflow: hidden;
-background-color: #f0f4f8;
+/* Background settings for Alphablocks */
+background-image: url('https://images.squarespace-cdn.com/content/v1/5710f92686db433103759a22/1464303498305-64O5N5P2G03J95I9I5Y2/image-asset.png');
+background-size: cover;
+background-position: center;
+background-repeat: no-repeat;
+background-color: rgba(240, 244, 248, 0.6); /* Tint to help text stand out */
+background-blend-mode: overlay;
 display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
 
@@ -30,7 +36,7 @@ animation: bounce 0.5s cubic-bezier(.5,0,.5,1) infinite alternate;
 
 #setup-screen {
 position: absolute; width: 100%; height: 100%;
-background: white; z-index: 2000;
+background: rgba(255, 255, 255, 0.9); z-index: 2000;
 display: flex; flex-direction: column; align-items: center; justify-content: center;
 padding: 20px; text-align: center;
 }
@@ -64,223 +70,4 @@ touch-action: manipulation;
 
 .word-card { 
 font-size: 80px; font-weight: bold; border: 12px solid #333; 
-padding: 50px 20px; margin: 0 15px; border-radius: 40px; 
-min-width: 260px; text-align: center; background: white; 
-box-shadow: 0 15px 30px rgba(0,0,0,0.15);
-cursor: pointer; user-select: none;
-pointer-events: none;
-transition: transform 0.2s, background-color 0.3s;
-}
-
-.card-active { pointer-events: auto; animation: jiggle 0.4s ease-out; }
-@keyframes jiggle { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-
-.card-correct { border-color: #28a745 !important; background-color: #d4edda !important; transform: scale(1.05) !important; }
-.card-incorrect { border-color: #dc3545 !important; background-color: #f8d7da !important; opacity: 0.6; }
-
-/* Persistent green at end of flash */
-.card-flash {
-animation: flashGreen 1.2s ease-in-out 3;
-border-color: #28a745 !important; 
-background-color: #d4edda !important;
-}
-
-@keyframes flashGreen {
-0%, 100% { border-color: #333; background-color: white; transform: scale(1); }
-50% { border-color: #28a745; background-color: #d4edda; transform: scale(1.05); }
-}
-
-#final-report { 
-display: none; padding: 40px; background: white; border: 10px solid #333; border-radius: 30px; 
-width: 80%; max-height: 80vh; overflow-y: auto; font-size: 28px;
-}
-</style>
-</head>
-<body>
-
-<div id="loader">
-<div class="ball"></div>
-<h2 id="loader-text" style="margin-top: 40px; color: #333;">Creating Lesson...</h2>
-</div>
-
-<div id="setup-screen">
-<h1>Sight Word Lesson Setup</h1>
-<div class="instruction-box">
-<strong>Directions:</strong>
-<ol style="margin-top: 5px;">
-<li>Enter the <b>Student's Name</b>.</li>
-<li>Enter words separated by commas.</li>
-<li>Click <b>Start Lesson</b>.</li>
-</ol>
-<label style="font-size: 20px; cursor: pointer;">
-<input type="checkbox" id="enable-sfx" checked style="transform: scale(1.5); margin-right: 10px;"> 
-Enable Feedback Sounds
-</label>
-</div>
-<input type="text" id="student-name" placeholder="Enter Student Name">
-<textarea id="word-input">horse, car, yellow, see, ball, and, fish</textarea>
-<button class="start-btn" id="main-start-btn">START LESSON</button>
-</div>
-
-<div id="student-view">
-<div class="word-card" id="card-0" onclick="handleTouch(0)"></div>
-<div class="word-card" id="card-1" onclick="handleTouch(1)"></div>
-<div class="word-card" id="card-2" onclick="handleTouch(2)"></div>
-</div>
-
-<div id="final-report">
-<h2 id="report-title" style="text-align: center;">Results</h2>
-<div id="report-content" style="line-height: 1.6; font-family: monospace;"></div>
-<button class="export-btn" onclick="exportCSV()">Download Results (.csv)</button>
-<button class="start-btn" onclick="location.reload()" style="background: #333; width: 100%;">Restart</button>
-</div>
-
-<script>
-let sightWords = [], remaining = [], currentTarget = "", displayedWords = [], isProcessing = false, sessionLog = [];
-let studentName = "", sfxEnabled = true;
-const synth = window.speechSynthesis;
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-let bestVoice = null;
-
-function pickVoice() {
-const voices = synth.getVoices();
-bestVoice = voices.find(v => v.name === 'Google US English') || 
-voices.find(v => v.name.includes('Siri') || v.name.includes('Samantha')) ||
-voices.find(v => v.lang.startsWith('en-US')) || voices[0];
-}
-
-if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = pickVoice;
-
-function playTone(freq, type, duration) {
-if (!sfxEnabled) return;
-const osc = audioCtx.createOscillator();
-const gain = audioCtx.createGain();
-osc.type = type;
-osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-osc.connect(gain); gain.connect(audioCtx.destination);
-osc.start(); osc.stop(audioCtx.currentTime + duration);
-}
-
-document.getElementById('main-start-btn').addEventListener('click', function() {
-document.activeElement.blur();
-pickVoice();
-studentName = document.getElementById('student-name').value || "Student";
-sfxEnabled = document.getElementById('enable-sfx').checked;
-const input = document.getElementById('word-input').value;
-sightWords = input.split(/[ ,]+/).filter(w => w.trim() !== "");
-remaining = [...sightWords].sort(() => 0.5 - Math.random());
-
-if(sightWords.length < 1) {
-alert("Please enter some words first!");
-return;
-}
-
-document.getElementById('setup-screen').style.display = "none";
-document.getElementById('loader').style.display = "flex";
-
-// Removed the synth.speak line that was saying "dot dot dot" here
-
-setTimeout(() => {
-document.getElementById('loader').style.display = "none";
-document.getElementById('student-view').style.display = "flex";
-nextTurn();
-}, 4000);
-});
-
-function speak(text, isTarget, onEndCallback) {
-synth.cancel(); 
-const utterance = new SpeechSynthesisUtterance(text);
-if (bestVoice) utterance.voice = bestVoice;
-utterance.rate = isTarget ? 0.78 : 0.82; 
-if (onEndCallback) utterance.onend = onEndCallback;
-synth.speak(utterance);
-}
-
-function nextTurn() {
-if (remaining.length === 0) return finishSession();
-currentTarget = remaining[0];
-let decoys = sightWords.filter(w => w !== currentTarget).sort(() => 0.5 - Math.random()).slice(0, 2);
-displayedWords = [currentTarget, ...decoys].sort(() => 0.5 - Math.random());
-
-for(let i=0; i<3; i++) {
-const card = document.getElementById(`card-${i}`);
-card.innerText = displayedWords[i];
-card.className = "word-card";
-card.style.visibility = "visible";
-}
-
-setTimeout(() => { 
-// Removed leading dots from the string below
-speak(`Show me ${currentTarget}`, true, () => {
-for(let i=0; i<3; i++) document.getElementById(`card-${i}`).classList.add('card-active');
-}); 
-}, 800);
-}
-
-function handleTouch(index) {
-if (isProcessing || !currentTarget) return;
-isProcessing = true;
-for(let i=0; i<3; i++) document.getElementById(`card-${i}`).classList.remove('card-active');
-
-const chosenWord = displayedWords[index];
-const isCorrect = (chosenWord === currentTarget);
-sessionLog.push({ word: currentTarget, result: isCorrect ? "+" : "-", timestamp: new Date().toLocaleTimeString() });
-
-for(let i=0; i<3; i++) {
-const card = document.getElementById(`card-${i}`);
-if (isCorrect) {
-if (displayedWords[i] === currentTarget) card.classList.add('card-correct');
-} else {
-if (displayedWords[i] === currentTarget) card.classList.add('card-flash');
-else if (i === index) card.classList.add('card-incorrect');
-}
-}
-
-if (isCorrect) {
-playTone(660, 'sine', 0.2); 
-setTimeout(() => speak("Correct!", false), 500);
-} else {
-playTone(220, 'triangle', 0.3); 
-setTimeout(() => {
-speak(`That was ${chosenWord}. The word is ${currentTarget}.`, true);
-}, 500);
-}
-
-remaining.shift(); 
-let delay = isCorrect ? 2500 : 5000; 
-
-setTimeout(() => {
-for(let i=0; i<3; i++) {
-const card = document.getElementById(`card-${i}`);
-card.style.visibility = "hidden";
-card.className = "word-card";
-}
-isProcessing = false;
-nextTurn();
-}, delay); 
-}
-
-function finishSession() {
-document.getElementById('student-view').style.display = "none";
-document.getElementById('final-report').style.display = "block";
-document.getElementById('report-title').innerText = `${studentName}'s Results`;
-document.getElementById('report-content').innerHTML = sessionLog.map(item => 
-`<strong>${item.word.toUpperCase()}</strong> : ${item.result}`
-).join('<br>');
-speak(`All finished, ${studentName}!`, false);
-}
-
-function exportCSV() {
-let csvContent = "data:text/csv;charset=utf-8,Student,Word,Result,Time\n";
-sessionLog.forEach(row => { csvContent += `${studentName},${row.word},${row.result},${row.timestamp}\n`; });
-const encodedUri = encodeURI(csvContent);
-const link = document.createElement("a");
-link.setAttribute("href", encodedUri);
-link.setAttribute("download", `${studentName.replace(/\s+/g, '_')}_Results.csv`);
-document.body.appendChild(link); link.click(); document.body.removeChild(link);
-}
-</script>
-</body>
-</html>
+padding: 50px 20px; margin: 0 15px; border-radius: 40px
