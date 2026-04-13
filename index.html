@@ -235,4 +235,85 @@ card.className = "word-card";
 card.style.visibility = "visible";
 }
 
-setTimeout(()
+setTimeout(() => { 
+speak(`Show me ${currentTarget}`, true, () => {
+for(let i=0; i<3; i++) document.getElementById(`card-${i}`).classList.add('card-active');
+}); 
+}, 800);
+}
+
+function handleTouch(index) {
+if (isProcessing || !currentTarget) return;
+isProcessing = true;
+for(let i=0; i<3; i++) document.getElementById(`card-${i}`).classList.remove('card-active');
+
+const chosenWord = displayedWords[index];
+const isCorrect = (chosenWord === currentTarget);
+sessionLog.push({ word: currentTarget, result: isCorrect ? "+" : "-", timestamp: new Date().toLocaleTimeString() });
+
+for(let i=0; i<3; i++) {
+const card = document.getElementById(`card-${i}`);
+if (isCorrect) {
+if (displayedWords[i] === currentTarget) card.classList.add('card-correct');
+} else {
+if (displayedWords[i] === currentTarget) card.classList.add('card-flash');
+else if (i === index) card.classList.add('card-incorrect');
+}
+}
+
+if (isCorrect) {
+playTone(660, 'sine', 0.2); 
+setTimeout(() => speak("Correct!", false), 500);
+} else {
+playTone(220, 'triangle', 0.3); 
+setTimeout(() => {
+speak(`That was ${chosenWord}. The word is ${currentTarget}.`, true);
+}, 500);
+}
+
+remaining.shift(); 
+let delay = isCorrect ? 2500 : 5000; 
+
+setTimeout(() => {
+for(let i=0; i<3; i++) {
+const card = document.getElementById(`card-${i}`);
+card.style.visibility = "hidden";
+card.className = "word-card";
+}
+// Show Alphablock transition before the next word
+if (remaining.length > 0) {
+    showTransition();
+    setTimeout(() => {
+        hideTransition();
+        isProcessing = false;
+        nextTurn();
+    }, 2000); // GIF stays up for 2 seconds
+} else {
+    isProcessing = false;
+    nextTurn();
+}
+}, delay); 
+}
+
+function finishSession() {
+document.getElementById('student-view').style.display = "none";
+document.getElementById('final-report').style.display = "block";
+document.getElementById('report-title').innerText = `${studentName}'s Results`;
+document.getElementById('report-content').innerHTML = sessionLog.map(item => 
+`<strong>${item.word.toUpperCase()}</strong> : ${item.result}`
+).join('<br>');
+speak(`All finished, ${studentName}!`, false);
+}
+
+function exportCSV() {
+let csvContent = "data:text/csv;charset=utf-8,Student,Word,Result,Time\n";
+sessionLog.forEach(row => { csvContent += `${studentName},${row.word},${row.result},${row.timestamp}\n`; });
+const encodedUri = encodeURI(csvContent);
+const link = document.createElement("a");
+link.setAttribute("href", encodedUri);
+link.setAttribute("download", `${studentName.replace(/\s+/g, '_')}_Results.csv`);
+document.body.appendChild(link); link.click(); document.body.removeChild(link);
+}
+</script>
+</body>
+</html>
