@@ -10,24 +10,24 @@ font-family: 'Comic Sans MS', sans-serif;
 margin: 0; padding: 0;
 width: 100vw; height: 100vh;
 overflow: hidden;
-background-color: #f0f4f8;
+/* Static Alphablocks Background */
+background-image: url('https://images.squarespace-cdn.com/content/v1/5710f92686db433103759a22/1464303498305-64O5N5P2G03J95I9I5Y2/image-asset.png');
+background-size: cover;
+background-position: center;
+background-repeat: no-repeat;
+background-color: rgba(240, 244, 248, 0.6); 
+background-blend-mode: overlay;
 display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
 
-/* Background Video Styling */
-#bg-video {
-position: fixed;
-top: 50%;
-left: 50%;
-min-width: 100%;
-min-height: 100%;
-width: auto;
-height: auto;
-z-index: -100;
-transform: translateX(-50%) translateY(-50%);
-background-size: cover;
-filter: opacity(0.7); /* Makes the video a bit lighter so words are easy to read */
+/* Transition GIF Overlay */
+#transition-overlay {
+position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+background: rgba(255, 255, 255, 0.9);
+z-index: 2500;
+display: none; flex-direction: column; align-items: center; justify-content: center;
 }
+#transition-gif { width: 300px; height: auto; border-radius: 20px; }
 
 #loader {
 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -45,7 +45,7 @@ animation: bounce 0.5s cubic-bezier(.5,0,.5,1) infinite alternate;
 
 #setup-screen {
 position: absolute; width: 100%; height: 100%;
-background: rgba(255, 255, 255, 0.9); z-index: 2000;
+background: rgba(255, 255, 255, 0.95); z-index: 2000;
 display: flex; flex-direction: column; align-items: center; justify-content: center;
 padding: 20px; text-align: center;
 }
@@ -93,17 +93,6 @@ transition: transform 0.2s, background-color 0.3s;
 .card-correct { border-color: #28a745 !important; background-color: #d4edda !important; transform: scale(1.05) !important; }
 .card-incorrect { border-color: #dc3545 !important; background-color: #f8d7da !important; opacity: 0.6; }
 
-.card-flash {
-animation: flashGreen 1.2s ease-in-out 3;
-border-color: #28a745 !important; 
-background-color: #d4edda !important;
-}
-
-@keyframes flashGreen {
-0%, 100% { border-color: #333; background-color: white; transform: scale(1); }
-50% { border-color: #28a745; background-color: #d4edda; transform: scale(1.05); }
-}
-
 #final-report { 
 display: none; padding: 40px; background: white; border: 10px solid #333; border-radius: 30px; 
 width: 80%; max-height: 80vh; overflow-y: auto; font-size: 28px;
@@ -112,10 +101,10 @@ width: 80%; max-height: 80vh; overflow-y: auto; font-size: 28px;
 </head>
 <body>
 
-<video autoplay muted loop id="bg-video">
-  <source src="https://raw.githubusercontent.com/cspring585/sight-words/main/Alphablocks_3_Top.mp4" type="video/mp4">
-  Your browser does not support HTML5 video.
-</video>
+<div id="transition-overlay">
+    <h2 id="transition-text" style="color: #007bff; font-size: 40px;">Great Job!</h2>
+    <img id="transition-gif" src="" alt="Alphablock celebration">
+</div>
 
 <div id="loader">
 <div class="ball"></div>
@@ -161,6 +150,13 @@ const synth = window.speechSynthesis;
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 let bestVoice = null;
 
+// List of Alphablocks transition GIFs
+const alphablockGifs = [
+    "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJieXp0Znc0Znc0Znc0Znc0Znc0Znc0Znc0Znc0Znc0Znc0Zncmaz1n/3o7TKMGpxPucVYTXYQ/giphy.gif",
+    "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJieXp0Znc0Znc0Znc0Znc0Znc0Znc0Znc0Znc0Znc0Znc0Zncmaz1n/l0HlS4Tq0Z6mSsh8c/giphy.gif",
+    "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExNHJieXp0Znc0Znc0Znc0Znc0Znc0Znc0Znc0Znc0Znc0Znc0Zncmaz1n/3o7TKDkDbIDJieKbVm/giphy.gif"
+];
+
 function pickVoice() {
 const voices = synth.getVoices();
 bestVoice = voices.find(v => v.name === 'Google US English') || 
@@ -185,10 +181,6 @@ osc.start(); osc.stop(audioCtx.currentTime + duration);
 document.getElementById('main-start-btn').addEventListener('click', function() {
 document.activeElement.blur();
 pickVoice();
-// Try to play the video if it got blocked by the browser
-const bgVid = document.getElementById('bg-video');
-if (bgVid) bgVid.play().catch(e => console.log("Auto-play blocked, waiting for interaction"));
-
 studentName = document.getElementById('student-name').value || "Student";
 sfxEnabled = document.getElementById('enable-sfx').checked;
 const input = document.getElementById('word-input').value;
@@ -219,6 +211,17 @@ if (onEndCallback) utterance.onend = onEndCallback;
 synth.speak(utterance);
 }
 
+function showTransition() {
+    const randomGif = alphablockGifs[Math.floor(Math.random() * alphablockGifs.length)];
+    const overlay = document.getElementById('transition-overlay');
+    document.getElementById('transition-gif').src = randomGif;
+    overlay.style.display = "flex";
+}
+
+function hideTransition() {
+    document.getElementById('transition-overlay').style.display = "none";
+}
+
 function nextTurn() {
 if (remaining.length === 0) return finishSession();
 currentTarget = remaining[0];
@@ -232,75 +235,4 @@ card.className = "word-card";
 card.style.visibility = "visible";
 }
 
-setTimeout(() => { 
-speak(`Show me ${currentTarget}`, true, () => {
-for(let i=0; i<3; i++) document.getElementById(`card-${i}`).classList.add('card-active');
-}); 
-}, 800);
-}
-
-function handleTouch(index) {
-if (isProcessing || !currentTarget) return;
-isProcessing = true;
-for(let i=0; i<3; i++) document.getElementById(`card-${i}`).classList.remove('card-active');
-
-const chosenWord = displayedWords[index];
-const isCorrect = (chosenWord === currentTarget);
-sessionLog.push({ word: currentTarget, result: isCorrect ? "+" : "-", timestamp: new Date().toLocaleTimeString() });
-
-for(let i=0; i<3; i++) {
-const card = document.getElementById(`card-${i}`);
-if (isCorrect) {
-if (displayedWords[i] === currentTarget) card.classList.add('card-correct');
-} else {
-if (displayedWords[i] === currentTarget) card.classList.add('card-flash');
-else if (i === index) card.classList.add('card-incorrect');
-}
-}
-
-if (isCorrect) {
-playTone(660, 'sine', 0.2); 
-setTimeout(() => speak("Correct!", false), 500);
-} else {
-playTone(220, 'triangle', 0.3); 
-setTimeout(() => {
-speak(`That was ${chosenWord}. The word is ${currentTarget}.`, true);
-}, 500);
-}
-
-remaining.shift(); 
-let delay = isCorrect ? 2500 : 5000; 
-
-setTimeout(() => {
-for(let i=0; i<3; i++) {
-const card = document.getElementById(`card-${i}`);
-card.style.visibility = "hidden";
-card.className = "word-card";
-}
-isProcessing = false;
-nextTurn();
-}, delay); 
-}
-
-function finishSession() {
-document.getElementById('student-view').style.display = "none";
-document.getElementById('final-report').style.display = "block";
-document.getElementById('report-title').innerText = `${studentName}'s Results`;
-document.getElementById('report-content').innerHTML = sessionLog.map(item => 
-`<strong>${item.word.toUpperCase()}</strong> : ${item.result}`
-).join('<br>');
-speak(`All finished, ${studentName}!`, false);
-}
-
-function exportCSV() {
-let csvContent = "data:text/csv;charset=utf-8,Student,Word,Result,Time\n";
-sessionLog.forEach(row => { csvContent += `${studentName},${row.word},${row.result},${row.timestamp}\n`; });
-const encodedUri = encodeURI(csvContent);
-const link = document.createElement("a");
-link.setAttribute("href", encodedUri);
-link.setAttribute("download", `${studentName.replace(/\s+/g, '_')}_Results.csv`);
-document.body.appendChild(link); link.click(); document.body.removeChild(link);
-}
-</script>
-</body>
-</html>
+setTimeout(()
